@@ -40,35 +40,31 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
 
   getSuggestions(query: string): (LookupItem | null)[] {
     const queryLowercase = query.toLowerCase();
-    const result: (LookupItem | null)[] = [];
+    const result: (LookupItem | null)[] 
+      = this.workspace.vaultList.flatMap(
+        vault => vault.tree.flatten().map(note => ({ note, vault }))
+      ).sort((a, b) => {
+		const pathA = a.note.getPath();
+		const pathB = b.note.getPath();
+		let prefixALength = 0;
+		let prefixBLength = 0;
+		while (prefixALength < queryLowercase.length && prefixALength < pathA.length && queryLowercase[prefixALength] === pathA[prefixALength]) {
+			prefixALength++;
+		}
+		while (prefixBLength < queryLowercase.length && prefixBLength < pathB.length && queryLowercase[prefixBLength] === pathB[prefixBLength]) {
+			prefixBLength++;
+		}
+		if (prefixALength !== prefixBLength) {
+			return prefixBLength - prefixALength;
+		}
+		return this.damerauLevenshteinDistance(queryLowercase, pathA, 10)
+			- this.damerauLevenshteinDistance(queryLowercase, pathB, 10);
+      })
 
-    let foundExact = true;
-
-    for (const vault of this.workspace.vaultList) {
-      let currentFoundExact = false;
-      for (const note of vault.tree.flatten()) {
-        const path = note.getPath();
-        const item: LookupItem = {
-          note,
-          vault,
-        };
-        if (path === queryLowercase) {
-          currentFoundExact = true;
-          result.unshift(item);
-          continue;
-        }
-        if (
-          note.title.toLowerCase().includes(queryLowercase) ||
-          note.name.includes(queryLowercase) ||
-          path.includes(queryLowercase)
-        )
-          result.push(item);
-      }
-
-      foundExact = foundExact && currentFoundExact;
-    }
-
-    if (!foundExact && queryLowercase.trim().length > 0) result.unshift(null);
+	const firstResult = result.find(() => true)
+    if (queryLowercase.trim().length > 0 && firstResult?.note.getPath().toLowerCase() !== queryLowercase.trim()) { 
+		result.unshift(null);
+	}
 
     return result;
   }
@@ -123,5 +119,98 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
     } else {
       new SelectVaultModal(this.app, this.workspace, doCreate).open();
     }
+  }
+
+  /**
+   * Computes the Damerau-Levenshtein distance between two strings.
+   * If the distance exceeds `threshold`, returns Number.MAX_SAFE_INTEGER.
+   *
+   * Note: Uses Array.from to iterate by code point (better Unicode handling).
+   *
+   * @param source first string
+   * @param target second string
+   * @param threshold maximum allowable distance
+   * @returns distance or Number.MAX_SAFE_INTEGER if threshold exceeded
+   */
+  damerauLevenshteinDistance(source: string, target: string, threshold: number): number {
+    let sa = Array.from(source);
+    let ta = Array.from(target);
+
+    let length1 = sa.length;
+    let length2 = ta.length;
+
+    if (Math.abs(length1 - length2) > threshold) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    // Ensure sa is the shorter sequence
+    if (length1 > length2) {
+      [sa, ta] = [ta, sa];
+      [length1, length2] = [length2, length1];
+    }
+
+    const maxi = length1;
+    const maxj = length2;
+
+    let dCurrent: number[] = new Array(maxi + 1).fill(0);
+    let dMinus1: number[] = new Array(maxi + 1).fill(0);
+    let dMinus2: number[] = new Array(maxi + 1).fill(0);
+    let dSwap: number[];
+
+    for (let i = 0; i <= maxi; i++) {
+      dCurrent[i] = i;
+    }
+
+    let jm1 = 0;
+    let im1 = 0;
+    let im2 = -1;
+
+    for (let j = 1; j <= maxj; j++) {
+      // Rotate buffers
+      dSwap = dMinus2;
+      dMinus2 = dMinus1;
+      dMinus1 = dCurrent;
+      dCurrent = dSwap;
+
+      let minDistance = Number.MAX_SAFE_INTEGER;
+      dCurrent[0] = j;
+      im1 = 0;
+      im2 = -1;
+
+      for (let i = 1; i <= maxi; i++) {
+        const cost = sa[im1] === ta[jm1] ? 0 : 1;
+
+        const del = dCurrent[im1] + 1;
+        const ins = dMinus1[i] + 1;
+        const sub = dMinus1[im1] + cost;
+
+        // Min of three integers (fast)
+        let min = del > ins ? (ins > sub ? sub : ins) : (del > sub ? sub : del);
+
+        if (
+          i > 1 &&
+          j > 1 &&
+          sa[im2] === ta[jm1] &&
+          sa[im1] === ta[j - 2]
+        ) {
+          min = Math.min(min, dMinus2[im2] + cost);
+        }
+
+        dCurrent[i] = min;
+        if (min < minDistance) {
+          minDistance = min;
+        }
+        im1++;
+        im2++;
+      }
+
+      jm1++;
+      if (minDistance > threshold) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+    }
+
+    const result = dCurrent[maxi];
+    return result > threshold ? Number.MAX_SAFE_INTEGER : result;
   }
 }

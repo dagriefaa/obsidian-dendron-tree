@@ -25,7 +25,7 @@ export default class DendronTreePlugin extends Plugin {
       id: "dendron-lookup",
       name: "Lookup Note",
       callback: () => {
-        new LookupModal(this.app, this.workspace).open();
+        new LookupModal(this.app, this.workspace, this.app.workspace.getActiveFile()?.basename).open();
       },
     });
 
