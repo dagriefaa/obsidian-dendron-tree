@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1-dagriefaa
+- Fix tree view not expanding to opened file on startup
+- Fix lookup completions requiring tab to be pressed twice
+- Lookup now contains path of current file when opened, selected
+- Lookup results are now slightly more intelligent:
+  - if empty, show first level results
+  - otherwise show first all that start with query sorted, then those that contain it sorted
+- Lookup query matches are now highlighted
+
 ## 1.3.0
 
 Fix:
