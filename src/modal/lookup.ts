@@ -31,6 +31,7 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
     if (this.initialQuery.length > 0) {
       this.inputEl.value = this.initialQuery;
       this.inputEl.dispatchEvent(new Event("input"));
+      this.inputEl.placeholder = "Lookup (tab to autocomplete, prefix ? to search by title)";
       this.inputEl.select();
     }
   }
