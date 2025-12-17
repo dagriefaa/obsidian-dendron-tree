@@ -12,6 +12,10 @@ Features:
 - Multi vault support
 - Custom resolver and renderer for link and embed
 
+## Installation
+1. run `npm run dist`
+2. copy contents of `./dist` into a folder in `/.obsidian/plugins`
+
 ## Dendron Tree
 
 To view the Dendron Tree you can select "Open Dendron Tree" in the Application's Ribbon bar.
