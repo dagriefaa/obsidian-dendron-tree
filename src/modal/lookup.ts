@@ -14,11 +14,8 @@ interface LookupItem {
 export class LookupModal extends SuggestModal<LookupItem | null> {
   constructor(app: App, private workspace: DendronWorkspace, private initialQuery: string = "") {
     super(app);
-    this.inputEl.addEventListener("keyup", (event) => {
-      if (event.code === "Tab") {
-        const selectedElement = this.resultContainerEl.querySelector(
-          ".is-selected"
-        ) as HTMLElement | null;
+	this.scope.register([], "Tab", (evt) => {
+		const selectedElement = this.resultContainerEl.querySelector(".is-selected") as HTMLElement | null;
         if (selectedElement) {
           const path = selectedElement.dataset["path"];
           if (path) {
@@ -26,8 +23,7 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
             this.inputEl.dispatchEvent(new Event("input"));
           }
         }
-      }
-    });
+	})
   }
 
   onOpen(): void {
