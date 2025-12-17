@@ -84,20 +84,24 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
     el.createEl("div", { cls: "suggestion-content" }, (el) => {
       el.createEl("div", { text: item?.note.title ?? "Create New", cls: "suggestion-title" });
       el.createEl("small", { cls: "suggestion-content suggestion-content-row", }, el => {
-        if (item) {
-          const query = this.inputEl.value;
-          const path = item.note.getPath();
-          // if path starts with query, bold that part
-          if ((path.toLowerCase()).startsWith(query.toLowerCase())) {
-            const boldPart = path.substring(0, query.length);
-            const restPart = path.substring(query.length);
-            el.createEl("span", { text: boldPart, cls: "suggestion-highlight" });
-            el.appendText(restPart + (this.workspace.vaultList.length > 1 ? ` (${item.vault.config.name})` : ""));
-          } else {
-            el.setText(path + (this.workspace.vaultList.length > 1 ? ` (${item.vault.config.name})` : ""));
-          }
-        } else {
+        if (!item) {
           el.setText("Note does not exist");
+          return
+        }
+        const query = this.inputEl.value;
+        const path = item.note.getPath();
+        
+        // if path contains query, bold that part
+        const index = path.toLowerCase().indexOf(query.toLowerCase());
+        if (!query.startsWith('?') && index >= 0) {
+          const boldPart = path.substring(index, index + query.length);
+          const restPart1 = path.substring(0, index);
+          const restPart2 = path.substring(index + query.length);
+          el.appendText(restPart1);
+          el.createEl("span", { text: boldPart, cls: "suggestion-highlight" });
+          el.appendText(restPart2);
+        } else {
+          el.setText(path);
         }
       });
     });
@@ -231,4 +235,24 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
     const result = dCurrent[maxi];
     return result > threshold ? Number.MAX_SAFE_INTEGER : result;
   }
+
+  sortByDistance(a: LookupItem, b: LookupItem, queryLowercase: string): number {
+		// order by distance from query
+        const pathA = a.note.getPath();
+        const pathB = b.note.getPath();
+		let prefixALength = 0;
+		let prefixBLength = 0;
+		while (prefixALength < queryLowercase.length && prefixALength < pathA.length && queryLowercase[prefixALength] === pathA[prefixALength]) {
+			prefixALength++;
+		}
+		while (prefixBLength < queryLowercase.length && prefixBLength < pathB.length && queryLowercase[prefixBLength] === pathB[prefixBLength]) {
+			prefixBLength++;
+		}
+      if (prefixALength !== prefixBLength) {
+        return prefixBLength - prefixALength;
+      }
+      return this.damerauLevenshteinDistance(queryLowercase, pathA, 10)
+        - this.damerauLevenshteinDistance(queryLowercase, pathB, 10);
+    }
+  
 }
