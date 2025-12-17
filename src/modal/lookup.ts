@@ -56,7 +56,27 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
       return result.filter(item => !item.note.getPath().includes('.'))
     }
 
-    // otherwise show first all that start with query sorted, then those that contain it sorted
+    // derive siblings if query is equal to current note
+    const currentPath = this.app.workspace.getActiveFile()?.basename.toLowerCase();
+    let siblings: LookupItem[] = []
+    if (queryLowercase === currentPath) {
+      const parentPath = currentPath?.includes('.')
+        ? currentPath.substring(0, currentPath.lastIndexOf('.'))
+        : "";
+      const depth = parentPath.split('.').length;
+      siblings = result.filter(item => {
+        const itemPath = item.note.getPath().toLowerCase();
+        if (itemPath === currentPath) {
+          return false;
+        }
+        if ((itemPath.split('.').length - 1) !== depth) {
+          return false;
+        }
+        return itemPath.startsWith(parentPath + '.');
+      });
+    }
+
+    // show first all that start with query sorted, then those that contain it sorted
     const startsWithResults = result.filter(item => 
       item.note.getPath().toLowerCase().startsWith(queryLowercase))
       .sort((a, b) => this.sortByDistance(a, b, queryLowercase));
@@ -65,6 +85,11 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
         && item.note.getPath().toLowerCase().includes(queryLowercase))
       .sort((a, b) => this.sortByDistance(a, b, queryLowercase));
     result = [...startsWithResults, ...containsResults];
+
+    // inject siblings after first result
+    if (siblings.length > 0) {
+      result.splice(1, 0, ...siblings);
+    }
 
     // add 'create new' if no exact match
     const firstResult = result.find(() => true)?.note.getPath().toLowerCase();
