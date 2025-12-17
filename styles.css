@@ -19,3 +19,11 @@
 .dendron-folder-suggest .suggestion-item {
   word-break: break-all;
 }
+
+.suggestion-item.mod-complex .suggestion-content.suggestion-content-row {
+	flex-direction: row;
+
+	.suggestion-highlight {
+		color: var(--color-accent-1);
+	}
+}

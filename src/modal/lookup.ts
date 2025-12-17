@@ -14,16 +14,16 @@ interface LookupItem {
 export class LookupModal extends SuggestModal<LookupItem | null> {
   constructor(app: App, private workspace: DendronWorkspace, private initialQuery: string = "") {
     super(app);
-	this.scope.register([], "Tab", (evt) => {
-		const selectedElement = this.resultContainerEl.querySelector(".is-selected") as HTMLElement | null;
-        if (selectedElement) {
-          const path = selectedElement.dataset["path"];
-          if (path) {
-            this.inputEl.value = path;
-            this.inputEl.dispatchEvent(new Event("input"));
-          }
+    this.scope.register([], "Tab", (evt) => {
+      const selectedElement = this.resultContainerEl.querySelector(".is-selected") as HTMLElement | null;
+      if (selectedElement) {
+        const path = selectedElement.dataset["path"];
+        if (path) {
+          this.inputEl.value = path;
+          this.inputEl.dispatchEvent(new Event("input"));
         }
-	})
+      }
+    })
   }
 
   onOpen(): void {
@@ -36,12 +36,12 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
 
   getSuggestions(query: string): (LookupItem | null)[] {
     const queryLowercase = query.toLowerCase();
-    const result: (LookupItem | null)[] 
+    const result: (LookupItem | null)[]
       = this.workspace.vaultList.flatMap(
         vault => vault.tree.flatten().map(note => ({ note, vault }))
       ).sort((a, b) => {
-		const pathA = a.note.getPath();
-		const pathB = b.note.getPath();
+        const pathA = a.note.getPath();
+        const pathB = b.note.getPath();
 		let prefixALength = 0;
 		let prefixBLength = 0;
 		while (prefixALength < queryLowercase.length && prefixALength < pathA.length && queryLowercase[prefixALength] === pathA[prefixALength]) {
@@ -50,17 +50,17 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
 		while (prefixBLength < queryLowercase.length && prefixBLength < pathB.length && queryLowercase[prefixBLength] === pathB[prefixBLength]) {
 			prefixBLength++;
 		}
-		if (prefixALength !== prefixBLength) {
-			return prefixBLength - prefixALength;
-		}
-		return this.damerauLevenshteinDistance(queryLowercase, pathA, 10)
-			- this.damerauLevenshteinDistance(queryLowercase, pathB, 10);
+        if (prefixALength !== prefixBLength) {
+          return prefixBLength - prefixALength;
+        }
+        return this.damerauLevenshteinDistance(queryLowercase, pathA, 10)
+          - this.damerauLevenshteinDistance(queryLowercase, pathB, 10);
       })
 
-	const firstResult = result.find(() => true)
-    if (queryLowercase.trim().length > 0 && firstResult?.note.getPath().toLowerCase() !== queryLowercase.trim()) { 
-		result.unshift(null);
-	}
+    const firstResult = result.find(() => true)
+    if (queryLowercase.trim().length > 0 && firstResult?.note.getPath().toLowerCase() !== queryLowercase.trim()) {
+      result.unshift(null);
+    }
 
     return result;
   }
@@ -72,11 +72,22 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
     }
     el.createEl("div", { cls: "suggestion-content" }, (el) => {
       el.createEl("div", { text: item?.note.title ?? "Create New", cls: "suggestion-title" });
-      el.createEl("small", {
-        text: item
-          ? path + (this.workspace.vaultList.length > 1 ? ` (${item.vault.config.name})` : "")
-          : "Note does not exist",
-        cls: "suggestion-content",
+      el.createEl("small", { cls: "suggestion-content suggestion-content-row", }, el => {
+        if (item) {
+          const query = this.inputEl.value;
+          const path = item.note.getPath();
+          // if path starts with query, bold that part
+          if ((path.toLowerCase()).startsWith(query.toLowerCase())) {
+            const boldPart = path.substring(0, query.length);
+            const restPart = path.substring(query.length);
+            el.createEl("span", { text: boldPart, cls: "suggestion-highlight" });
+            el.appendText(restPart + (this.workspace.vaultList.length > 1 ? ` (${item.vault.config.name})` : ""));
+          } else {
+            el.setText(path + (this.workspace.vaultList.length > 1 ? ` (${item.vault.config.name})` : ""));
+          }
+        } else {
+          el.setText("Note does not exist");
+        }
       });
     });
     if (!item || !item.note.file)
