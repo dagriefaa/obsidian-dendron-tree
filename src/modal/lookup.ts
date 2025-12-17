@@ -35,36 +35,46 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
   }
 
   getSuggestions(query: string): (LookupItem | null)[] {
-    const queryLowercase = query.toLowerCase();
-    const result: (LookupItem | null)[]
+    const queryLowercase = query.toLowerCase().trim();
+    let result: (LookupItem)[]
       = this.workspace.vaultList.flatMap(
         vault => vault.tree.flatten().map(note => ({ note, vault }))
-      ).sort((a, b) => {
-		// order by distance from query
-        const pathA = a.note.getPath();
-        const pathB = b.note.getPath();
-		let prefixALength = 0;
-		let prefixBLength = 0;
-		while (prefixALength < queryLowercase.length && prefixALength < pathA.length && queryLowercase[prefixALength] === pathA[prefixALength]) {
-			prefixALength++;
-		}
-		while (prefixBLength < queryLowercase.length && prefixBLength < pathB.length && queryLowercase[prefixBLength] === pathB[prefixBLength]) {
-			prefixBLength++;
-		}
-        if (prefixALength !== prefixBLength) {
-          return prefixBLength - prefixALength;
-        }
-        return this.damerauLevenshteinDistance(queryLowercase, pathA, 10)
-          - this.damerauLevenshteinDistance(queryLowercase, pathB, 10);
-      })
+      );
 
-    const firstResult = result.find(() => true)
-    if (queryLowercase.trim().length > 0 && firstResult?.note.getPath().toLowerCase() !== queryLowercase.trim()) {
-      result.unshift(null); // add 'create new' if no exact match
+    // if prefixed by ?, search by title
+    if (queryLowercase.startsWith("?")) {
+      const titleQuery = queryLowercase.substring(1);
+      result = result.filter(item => item.note.title.toLowerCase().includes(titleQuery))
+        .sort((a, b) => this.sortByDistance(a, b, titleQuery));
+      return result;
+    }
+          
+    // if empty string, show all 1st level results
+    if (queryLowercase.length === 0) {
+      return result.filter(item => !item.note.getPath().includes('.'))
+    }
+
+    // otherwise show first all that start with query sorted, then those that contain it sorted
+    const startsWithResults = result.filter(item => 
+      item.note.getPath().toLowerCase().startsWith(queryLowercase))
+      .sort((a, b) => this.sortByDistance(a, b, queryLowercase));
+    const containsResults = result.filter(item => 
+      !item.note.getPath().toLowerCase().startsWith(queryLowercase)
+        && item.note.getPath().toLowerCase().includes(queryLowercase))
+      .sort((a, b) => this.sortByDistance(a, b, queryLowercase));
+    result = [...startsWithResults, ...containsResults];
+
+    // add 'create new' if no exact match
+    const firstResult = result.find(() => true)?.note.getPath().toLowerCase();
+    if (queryLowercase.length > 0 
+      && !queryLowercase?.endsWith('.')
+      && firstResult !== queryLowercase) {
+        return [null, ...result]
     }
 
     return result;
   }
+
   renderSuggestion(item: LookupItem | null, el: HTMLElement) {
     el.classList.add("mod-complex");
     const path = item?.note.getPath();
