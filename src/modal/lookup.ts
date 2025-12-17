@@ -40,6 +40,7 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
       = this.workspace.vaultList.flatMap(
         vault => vault.tree.flatten().map(note => ({ note, vault }))
       ).sort((a, b) => {
+		// order by distance from query
         const pathA = a.note.getPath();
         const pathB = b.note.getPath();
 		let prefixALength = 0;
@@ -59,7 +60,7 @@ export class LookupModal extends SuggestModal<LookupItem | null> {
 
     const firstResult = result.find(() => true)
     if (queryLowercase.trim().length > 0 && firstResult?.note.getPath().toLowerCase() !== queryLowercase.trim()) {
-      result.unshift(null);
+      result.unshift(null); // add 'create new' if no exact match
     }
 
     return result;
