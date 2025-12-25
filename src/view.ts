@@ -28,6 +28,7 @@ export class DendronView extends ItemView {
     this.component = new Component({
       target: this.contentEl,
     });
+    this.plugin.onOpenFile(this.app.workspace.getActiveFile() || null)
   }
 
   async onClose() {

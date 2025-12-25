@@ -46,8 +46,6 @@ export default class DendronTreePlugin extends Plugin {
       this.registerEvent(this.app.metadataCache.on("resolve", this.onResolveMetadata));
       this.registerEvent(this.app.workspace.on("file-open", this.onOpenFile, this));
       this.registerEvent(this.app.workspace.on("file-menu", this.onFileMenu));
-
-      setTimeout(() => this.onOpenFile(this.app.workspace.getActiveFile() || null), 500);
     });
 
     this.configureCustomResolver();
