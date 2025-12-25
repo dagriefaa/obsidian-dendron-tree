@@ -46,6 +46,13 @@
     new LookupModal(app, workspace, note.getPath(true)).open();
   }
 
+  function renameNote() {
+    openFile(getPlugin().app, note.file)?.then(() => {
+
+    this.app.commands.executeCommandById("workspace:edit-file-title");
+    })
+  }
+
   function openMenu(e: MouseEvent) {
     const menu = new Menu();
 
@@ -83,6 +90,10 @@
 
     menu.addItem((item) => {
       item.setTitle("Create New Note").setIcon("plus").onClick(openLookup);
+    });
+
+    menu.addItem((item) => {
+      item.setTitle("Rename Note").setIcon("edit").onClick(renameNote);
     });
 
     if (note.file)
