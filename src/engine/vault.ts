@@ -21,6 +21,7 @@ export class DendronVault {
     if (!frontmatter) return undefined;
     return {
       title: frontmatter["title"],
+      navOrder: frontmatter["nav_order"],
     };
   }
 

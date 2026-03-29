@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.3-dagriefaa
+- Add sorting notes in tree by nav_order frontmatter property
+
 ## 1.3.2-dagriefaa
 - Fix tree view not expanding to opened file on startup when view isn't open on startup
 - Add 'Rename Note' context option to tree view

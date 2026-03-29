@@ -2,6 +2,7 @@ import { TFile } from "obsidian";
 
 export interface NoteMetadata {
   title?: string;
+  navOrder?: number;
 }
 
 export class Note {
@@ -10,6 +11,7 @@ export class Note {
   file?: TFile;
   parent?: Note;
   title = "";
+  navOrder: number = Number.MAX_SAFE_INTEGER;
 
   constructor(private originalName: string, private titlecase: boolean) {
     this.name = originalName.toLowerCase();
@@ -34,7 +36,7 @@ export class Note {
   }
 
   sortChildren(rescursive: boolean) {
-    this.children.sort((a, b) => a.title.localeCompare(b.title));
+    this.children.sort((a, b) => a.navOrder - b.navOrder || a.title.localeCompare(b.title));
     if (rescursive) this.children.forEach((child) => child.sortChildren(rescursive));
   }
 
@@ -67,6 +69,7 @@ export class Note {
     this.title = metadata?.title
       ? String(metadata?.title)
       : generateNoteTitle(this.originalName, this.titlecase);
+    this.navOrder = metadata?.navOrder ?? Number.MAX_SAFE_INTEGER;
   }
 }
 
