@@ -11,10 +11,16 @@
 
   export let note: Note;
   export let isRoot: boolean = false;
+  export let renderChildren: boolean = true;
   export let vault: DendronVault;
 
   let headerElement: HTMLDivElement;
-  let isCollapsed = true;
+  let isCollapsed = !note.navExpand;
+  let previousNavExpand = note.navExpand;
+  $: if (note.navExpand !== previousNavExpand) {
+    isCollapsed = !note.navExpand;
+    previousNavExpand = note.navExpand;
+  }
   $: isActive = note.file && $activeFile === note.file;
 
   const icon: Action = function (node) {
@@ -153,7 +159,7 @@
     on:contextmenu={openMenu}
     bind:this={headerElement}
   >
-    {#if note.children.length > 0}
+    {#if renderChildren && note.children.length > 0}
       <div
         class="tree-item-icon collapse-icon"
         class:is-collapsed={isCollapsed}
@@ -170,7 +176,7 @@
       <div class="dendron-tree-not-found" />
     {/if}
   </div>
-  {#if note.children.length > 0 && !isCollapsed}
+  {#if renderChildren && note.children.length > 0 && !isCollapsed}
     <div
       class="tree-item-children"
       transition:slide={{ duration: 100 }}

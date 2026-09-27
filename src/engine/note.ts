@@ -3,6 +3,7 @@ import { TFile } from "obsidian";
 export interface NoteMetadata {
   title?: string;
   navOrder?: number;
+  navExpand?: boolean;
 }
 
 export class Note {
@@ -12,6 +13,7 @@ export class Note {
   parent?: Note;
   title = "";
   navOrder: number = Number.MAX_SAFE_INTEGER;
+  navExpand = false;
 
   constructor(private originalName: string, private titlecase: boolean) {
     this.name = originalName.toLowerCase();
@@ -70,6 +72,7 @@ export class Note {
       ? String(metadata?.title)
       : generateNoteTitle(this.originalName, this.titlecase);
     this.navOrder = metadata?.navOrder ?? Number.MAX_SAFE_INTEGER;
+    this.navExpand = metadata?.navExpand === true;
   }
 }
 

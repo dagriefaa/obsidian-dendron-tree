@@ -136,6 +136,19 @@ describe("note class", () => {
     });
     expect(note.title).toBe("Butuh Kamu");
   });
+
+  it("expands by default when navExpand is true", () => {
+    const note = new Note("parent", true);
+    note.syncMetadata({ navExpand: true });
+    expect(note.navExpand).toBe(true);
+  });
+
+  it("does not expand by default without navExpand", () => {
+    const note = new Note("parent", true);
+    note.syncMetadata({ navExpand: true });
+    note.syncMetadata(undefined);
+    expect(note.navExpand).toBe(false);
+  });
 });
 
 function createTFile(path: string): TFile {

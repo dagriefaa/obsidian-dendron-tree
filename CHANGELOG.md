@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.4-dagriefaa
+- Show the root note separately above the top-level notes
+- Add default note expansion with the nav_expand frontmatter property
+
 ## 1.3.3-dagriefaa
 - Add sorting notes in tree by nav_order frontmatter property
 
