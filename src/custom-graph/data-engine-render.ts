@@ -2,6 +2,7 @@ import { App, GraphData, GraphEngine, GraphNodeData, LocalGraphData, TFile } fro
 import { Note } from "src/engine/note";
 import { DendronVault } from "src/engine/vault";
 import { DendronWorkspace } from "src/engine/workspace";
+import { parseTimestamp } from "src/datetime";
 import { isLocalGraphView } from "./utils";
 
 type DendronGraphNode = {
@@ -67,8 +68,8 @@ function getGlobalNodes(
 
           if (!metadata) map.set(dendronNode, Infinity);
           else {
-            const created = parseInt(metadata["created"]);
-            map.set(dendronNode, isNaN(created) ? Infinity : created);
+            // created may be a legacy unix timestamp or a datetime string
+            map.set(dendronNode, parseTimestamp(metadata["created"]));
           }
         }
       }

@@ -1,8 +1,9 @@
 import { App, TAbstractFile, TFile, TFolder } from "obsidian";
-import { NoteMetadata, NoteTree } from "./note";
+import { NoteMetadata, Note, NoteTree } from "./note";
 import { InvalidRootModal } from "../modal/invalid-root";
 import { generateUUID, getFolderFile } from "../utils";
 import { ParsedPath } from "../path";
+import { toDatetimeString, FRONTMATTER_DATETIME_FORMAT } from "../datetime";
 
 export interface VaultConfig {
   path: string;
@@ -56,20 +57,20 @@ export class DendronVault {
     return await this.app.vault.create(filePath, "");
   }
 
-  async generateFronmatter(file: TFile) {
-    if (!this.isNote(file.extension)) return;
-
-    const note = this.tree.getFromFileName(file.basename);
-
-    if (!note) return false;
-
-    return await this.app.fileManager.processFrontMatter(file, (fronmatter) => {
-      if (!fronmatter.id) fronmatter.id = generateUUID();
-      if (!fronmatter.title) fronmatter.title = note.title;
-      if (fronmatter.desc === undefined) fronmatter.desc = "";
-      if (!fronmatter.created) fronmatter.created = file.stat.ctime;
-      if (!fronmatter.updated) fronmatter.updated = file.stat.mtime;
-    });
+  /**
+   * Fill missing Dendron frontmatter properties on a note's frontmatter object.
+   * created/updated are written as datetime strings in the given moment format.
+   */
+  fillFrontmatter(frontmatter: Record<string, unknown>, note: Note) {
+    const now = Date.now();
+    if (!frontmatter.id) frontmatter.id = generateUUID();
+    if (!frontmatter.title) frontmatter.title = note.title;
+    if (frontmatter.desc === undefined) frontmatter.desc = "";
+    if (!frontmatter.created)
+      frontmatter.created = toDatetimeString(now, FRONTMATTER_DATETIME_FORMAT);
+    if (!frontmatter.updated)
+      frontmatter.updated = toDatetimeString(now, FRONTMATTER_DATETIME_FORMAT);
+    return frontmatter;
   }
 
   isNote(extension: string) {

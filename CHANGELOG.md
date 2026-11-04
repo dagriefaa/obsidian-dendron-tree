@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.5-dagriefaa
+- support `updated` frontmatter
+- make `created`/`updated` frontmatter use ISO date strings (i.e. they render in obsidian as dates) instead of unix millis (dendron)
+- existing notes will be migrated to use date strings on open
+
 ## 1.3.4-dagriefaa
 - Show the root note separately above the top-level notes
 - Add default note expansion with the nav_expand frontmatter property

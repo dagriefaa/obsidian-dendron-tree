@@ -5,15 +5,34 @@ import { LookupModal } from "./modal/lookup";
 import { dendronActivityBarIcon, dendronActivityBarName } from "./icons";
 import { DEFAULT_SETTINGS, DendronTreePluginSettings, DendronTreeSettingTab } from "./settings";
 import { parsePath } from "./path";
+import { legacyToDatetime, FRONTMATTER_DATETIME_FORMAT } from "./datetime";
+import { moment } from "obsidian";
+import type MomentDefault from "moment";
 import { DendronWorkspace } from "./engine/workspace";
 import { CustomResolver } from "./custom-resolver";
 import { CustomGraph } from "./custom-graph";
+
+/** Delay after the last edit before the updated-on-edit frontmatter write happens */
+const MODIFIED_UPDATE_DELAY = 5000;
+/** Window after our own frontmatter writes during which modified-time timers are retried */
+const FRONTMATTER_GUARD_MS = 10000;
+/** Window in which the last observed file modification is known to be our own frontmatter write */
+const OWN_WRITE_WINDOW_MS = 2000;
 
 export default class DendronTreePlugin extends Plugin {
   settings: DendronTreePluginSettings;
   workspace: DendronWorkspace = new DendronWorkspace(this.app);
   customResolver?: CustomResolver;
   customGraph?: CustomGraph;
+
+  /** Debounce timers for the updated-on-edit write, by file path */
+  private updateTimers = new Map<string, number>();
+  /** Suppresses modified-time updates right after our own frontmatter writes */
+  private frontmatterWriteGuard = new Map<string, number>();
+  /** Paths whose in-flight file write is one of our own frontmatter writes */
+  private frontmatterWriteInFlight = new Set<string>();
+  /** Paths whose last observed modification was caused by our own frontmatter write */
+  private ownWriteRecent = new Map<string, number>();
 
   async onload() {
     await this.loadSettings();
@@ -41,6 +60,7 @@ export default class DendronTreePlugin extends Plugin {
       this.onRootFolderChanged();
 
       this.registerEvent(this.app.vault.on("create", this.onCreateFile));
+      this.registerEvent(this.app.vault.on("modify", this.onModifyFile));
       this.registerEvent(this.app.vault.on("delete", this.onDeleteFile));
       this.registerEvent(this.app.vault.on("rename", this.onRenameFile));
       this.registerEvent(this.app.metadataCache.on("resolve", this.onResolveMetadata));
@@ -84,7 +104,10 @@ export default class DendronTreePlugin extends Plugin {
     }
   }
 
-  onunload() { }
+  onunload() {
+    this.updateTimers.forEach((timer) => window.clearTimeout(timer));
+    this.updateTimers.clear();
+  }
 
   onRootFolderChanged() {
     this.workspace.changeVault(this.settings.vaultList);
@@ -118,11 +141,118 @@ export default class DendronTreePlugin extends Plugin {
   onCreateFile = async (file: TAbstractFile) => {
     const vault = this.workspace.findVaultByParent(file.parent);
     if (vault && vault.onFileCreated(file)) {
-      if (this.settings.autoGenerateFrontmatter && file instanceof TFile && file.stat.size === 0)
-        await vault.generateFronmatter(file);
+      if (this.settings.autoGenerateFrontmatter && file instanceof TFile && file.stat.size === 0) {
+        const note = vault.tree.getFromFileName(file.basename);
+        if (note) {
+          await this.writeFrontMatterGuarded(file, (frontmatter) =>
+            vault.fillFrontmatter(frontmatter, note)
+          );
+        }
+      }
       this.updateNoteStore();
     }
   };
+
+  onModifyFile = (file: TAbstractFile) => {
+    if (!(file instanceof TFile)) return;
+    const vault = this.workspace.findVaultByParentPath(parsePath(file.path).dir);
+    if (!vault || !vault.isNote(file.extension)) return;
+
+    if (this.frontmatterWriteInFlight.has(file.path)) {
+      // This modification is our own frontmatter write, there was no user edit
+      this.ownWriteRecent.set(file.path, Date.now() + OWN_WRITE_WINDOW_MS);
+      return;
+    }
+
+    const existingTimer = this.updateTimers.get(file.path);
+    if (existingTimer) window.clearTimeout(existingTimer);
+    this.updateTimers.set(
+      file.path,
+      window.setTimeout(() => this.updateModifiedTime(file), MODIFIED_UPDATE_DELAY)
+    );
+  };
+
+  private async updateModifiedTime(file: TFile) {
+    this.updateTimers.delete(file.path);
+
+    const guard = this.frontmatterWriteGuard.get(file.path);
+    if (guard && guard > Date.now()) {
+      // Our own frontmatter write recently happened or is still in flight, retry later
+      this.updateTimers.set(
+        file.path,
+        window.setTimeout(
+          () => this.updateModifiedTime(file),
+          Math.max(guard - Date.now(), 0) + 100
+        )
+      );
+      return;
+    }
+
+    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    if (!frontmatter || frontmatter["updated"] === undefined) return;
+
+    const ownWrite = this.ownWriteRecent.get(file.path);
+    if (ownWrite && ownWrite > Date.now()) return;
+
+    const now = (moment as unknown as typeof MomentDefault)().format(FRONTMATTER_DATETIME_FORMAT);
+    if (frontmatter["updated"] === now) return;
+
+    await this.writeFrontMatterGuarded(file, (frontmatter) => {
+      frontmatter["updated"] = now;
+    });
+  }
+
+  /**
+   * Convert legacy unix millisecond created/updated frontmatter values to
+   * datetime strings when a note is opened.
+   */
+  private async migrateNoteTimestamps(file: TFile) {
+    try {
+      const vault = this.workspace.findVaultByParentPath(parsePath(file.path).dir);
+      if (!vault || !vault.isNote(file.extension)) return;
+
+      const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!frontmatter) return;
+      const format = FRONTMATTER_DATETIME_FORMAT;
+      if (
+        legacyToDatetime(frontmatter["created"], format) === undefined &&
+        legacyToDatetime(frontmatter["updated"], format) === undefined
+      )
+        return;
+
+      await this.writeFrontMatterGuarded(file, (frontmatter) => {
+        const created = legacyToDatetime(frontmatter["created"], format);
+        if (created !== undefined) frontmatter["created"] = created;
+        const updated = legacyToDatetime(frontmatter["updated"], format);
+        if (updated !== undefined) frontmatter["updated"] = updated;
+      });
+    } catch (error) {
+      console.error("DendronTree: failed to migrate note timestamps", file.path, error);
+    }
+  }
+
+  /** Write frontmatter changes via processFrontMatter */
+  private async writeFrontMatterIn(
+    file: TFile,
+    generate: (frontmatter: Record<string, unknown>) => void
+  ) {
+    this.frontmatterWriteInFlight.add(file.path);
+    try {
+      await this.app.fileManager.processFrontMatter(file, generate);
+    } finally {
+      this.frontmatterWriteInFlight.delete(file.path);
+    }
+  }
+
+  /** Write frontmatter while suppressing the modified-time update listener */
+  private async writeFrontMatterGuarded(
+    file: TFile,
+    generate: (frontmatter: Record<string, unknown>) => void
+  ) {
+    this.frontmatterWriteGuard.set(file.path, Date.now() + FRONTMATTER_GUARD_MS);
+    await this.writeFrontMatterIn(file, generate);
+    this.frontmatterWriteGuard.set(file.path, Date.now() + FRONTMATTER_GUARD_MS);
+  }
 
   onDeleteFile = (file: TAbstractFile) => {
     // file.parent is null when file is deleted
@@ -148,10 +278,11 @@ export default class DendronTreePlugin extends Plugin {
     if (update) this.updateNoteStore();
   };
 
-  onOpenFile(file: TFile | null) {
+  onOpenFile = (file: TFile | null) => {
     activeFile.set(file);
     if (file && this.settings.autoReveal) this.revealFile(file);
-  }
+    if (file) void this.migrateNoteTimestamps(file);
+  };
 
   onFileMenu = (menu: Menu, file: TAbstractFile) => {
     if (!(file instanceof TFile)) return;
