@@ -69,7 +69,20 @@ export class LinkLivePlugin implements PluginValue {
   decorations: DecorationSet = Decoration.none;
   widgets: LinkWidget[] = [];
 
-  constructor(public app: App, public workspace: DendronWorkspace, public editorView: EditorView) {
+  /**
+   * When true, wikilinks with an alias are left untouched (they are rendered
+   * natively by obsidian). Used by the title only resolver, which only
+   * handles wikilinks without an alias.
+   */
+  ignoreAliases = false;
+
+  constructor(
+    public app: App,
+    public workspace: DendronWorkspace,
+    public editorView: EditorView,
+    ignoreAliases?: boolean
+  ) {
+    if (ignoreAliases) this.ignoreAliases = true;
     this.decorations = this.buildDecorations(editorView);
   }
 
@@ -179,15 +192,16 @@ export class LinkLivePlugin implements PluginValue {
     }
 
     const links = this.getLinks(view);
-    if (links.length === 0) return Decoration.none;
+    const relevantLinks = this.ignoreAliases ? links.filter((link) => !link.hasAlias) : links;
+    if (relevantLinks.length === 0) return Decoration.none;
 
-    this.configureLinkVisibility(links, view);
+    this.configureLinkVisibility(relevantLinks, view);
 
     const builder = new RangeSetBuilder<Decoration>();
     const currentWidgets: LinkWidget[] = [];
     const sourcePath = view.state.field(editorInfoField).file?.path ?? "";
 
-    for (const link of links) {
+    for (const link of relevantLinks) {
       if (link.showSource) continue;
 
       const widget = this.getWidget(link, sourcePath);

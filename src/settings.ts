@@ -12,6 +12,7 @@ export interface DendronTreePluginSettings {
   autoGenerateFrontmatter: boolean;
   autoReveal: boolean;
   customResolver: boolean;
+  titleOnlyResolver: boolean;
   customGraph: boolean;
   deleteMethod: string;
 }
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: DendronTreePluginSettings = {
   autoGenerateFrontmatter: true,
   autoReveal: true,
   customResolver: false,
+  titleOnlyResolver: true,
   customGraph: false,
   deleteMethod: "moveToTrash",
 };
@@ -92,6 +94,18 @@ export class DendronTreeSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Title Only Resolver")
+      .setDesc(
+        "Render wikilinks without an alias as the target note's frontmatter title (reading and live preview). Only applies when Custom Resolver is disabled, which already includes this behavior. (Please reopen editor after change this setting)"
+      )
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.titleOnlyResolver).onChange(async (value) => {
+          this.plugin.settings.titleOnlyResolver = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
       .setName("Custom Graph Engine")
       .setDesc("Use custom graph engine to render graph (Experimental)")
       .addToggle((toggle) => {
@@ -139,6 +153,7 @@ export class DendronTreeSettingTab extends PluginSettingTab {
     super.hide();
     this.plugin.onRootFolderChanged();
     this.plugin.configureCustomResolver();
+    this.plugin.configureTitleOnlyResolver();
     this.plugin.configureCustomGraph();
   }
 }

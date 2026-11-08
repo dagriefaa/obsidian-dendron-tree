@@ -10,6 +10,7 @@ import { moment } from "obsidian";
 import type MomentDefault from "moment";
 import { DendronWorkspace } from "./engine/workspace";
 import { CustomResolver } from "./custom-resolver";
+import { TitleOnlyResolver } from "./custom-resolver/title-only";
 import { CustomGraph } from "./custom-graph";
 
 /** Delay after the last edit before the updated-on-edit frontmatter write happens */
@@ -23,6 +24,7 @@ export default class DendronTreePlugin extends Plugin {
   settings: DendronTreePluginSettings;
   workspace: DendronWorkspace = new DendronWorkspace(this.app);
   customResolver?: CustomResolver;
+  titleOnlyResolver?: TitleOnlyResolver;
   customGraph?: CustomGraph;
 
   /** Debounce timers for the updated-on-edit write, by file path */
@@ -71,6 +73,7 @@ export default class DendronTreePlugin extends Plugin {
     });
 
     this.configureCustomResolver();
+    this.configureTitleOnlyResolver();
     this.configureCustomGraph();
   }
 
@@ -121,6 +124,23 @@ export default class DendronTreePlugin extends Plugin {
     } else if (!this.settings.customResolver && this.customResolver) {
       this.removeChild(this.customResolver);
       this.customResolver = undefined;
+    }
+  }
+
+  /**
+   * Separately toggled lightweight resolver that only renders wikilinks
+   * without an alias as the target note's frontmatter title. It is superseded
+   * by the full custom resolver (which already includes this behavior), so it
+   * is only active when that one is disabled.
+   */
+  configureTitleOnlyResolver() {
+    const enabled = this.settings.titleOnlyResolver && !this.settings.customResolver;
+    if (enabled && !this.titleOnlyResolver) {
+      this.titleOnlyResolver = new TitleOnlyResolver(this, this.workspace);
+      this.addChild(this.titleOnlyResolver);
+    } else if (!enabled && this.titleOnlyResolver) {
+      this.removeChild(this.titleOnlyResolver);
+      this.titleOnlyResolver = undefined;
     }
   }
 

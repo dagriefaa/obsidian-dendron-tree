@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.6-dagriefaa
+- add 'title only resolver' that only renders frontmatter titles for wikilinks without aliases
+- apply the link resolver to wikilinks inside transcluded/embedded notes (`![[note]]`)
+
 ## 1.3.5-dagriefaa
 - support `updated` frontmatter
 - make `created`/`updated` frontmatter use ISO date strings (i.e. they render in obsidian as dates) instead of unix millis (dendron)
